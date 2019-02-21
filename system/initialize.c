@@ -155,6 +155,9 @@ static	void	sysinit()
 		semptr->squeue = newqueue();
 	}
 
+	/* Initialize locks */
+	linit();
+
 	/* Initialize buffer pools */
 
 	bufinit();

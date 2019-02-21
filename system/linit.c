@@ -1,12 +1,19 @@
 /*	linit.c	- linit	initialize lock system */
 #include <xinu.h>
 
-/* Lab 2: Complete this function */
-
-// declare any global variables here
+struct lockent locktab[NLOCKS];
 
 void linit(void) {
   
-	// your implementation goes here
-        // make sure to call this in initialize.c
+	/* Walk through lock table and initialize every lock entry */ 
+	struct lockent *lptr;
+	int32 i;
+
+	for(i = 0; i < NLOCKS; i++){
+		lptr = &locktab[i];
+		lptr->lstate 	 = L_FREE;
+		lptr->ltype		 = FREE;
+		lptr->numReaders = 0;
+		lptr->lqueue 	 = newqueue();
+	}
 }
