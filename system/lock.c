@@ -25,9 +25,6 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	/* If the lock is not held, process gets lock */
 	if(lptr->ltype == FREE){
 		lptr->ltype = type; 
-		if(type == READ){
-			lptr->numReaders++;
-		}
 		restore(mask);
 		return OK;
 	}
@@ -38,13 +35,11 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	if(lptr->ltype == READ && type == READ){
 		//If the queue is empty, give lock
 		if(isempty(lptr->lqueue)){
-			lptr->numReaders++;
 			restore(mask);
 			return OK;
 		}
 		/* Queue is not empty, there must be a writer at the front of the queue. */
 		else if( lpriority >= firstid(lptr->lqueue) ){ 			
-			lptr->numReaders++;
 			restore(mask);
 			return OK;
 		}
@@ -54,7 +49,6 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	/* This call should block */
 	if(type == READ){
 		insertReader(currpid, lptr->lqueue, lpriority);
-		lptr->numReaders++;
 		proctab[currpid].prstate = PR_LWAIT_R;
 	}
 	else{
