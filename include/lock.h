@@ -20,4 +20,5 @@ struct	lockent {
 
 extern struct lockent locktab[NLOCKS];
 
+
 #define	isbadlock(l)	((int32)(l) < 0 || (l) >= NLOCKS)

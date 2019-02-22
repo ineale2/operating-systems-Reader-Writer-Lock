@@ -3,11 +3,13 @@
 
 /* Lab 2: Complete this function */
 
+local status insertReader(pid32 pid, qid16 q, int32 key);
+local status insertWriter(pid32 pid, qid16 q, int32 key);
+
 syscall lock(int32 ldes, int32 type, int32 lpriority) {
 
 
 	//TODO: Update kill to deal with state of deleetion
-	//TODO: Make sure all return paths restoremask
 
 	intmask mask;
 	struct lockent * lptr;
@@ -50,17 +52,52 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	}
 	
 	/* This call should block */
-	//TODO: FINISH THIS	 decide how to store reader or writer (in  process table or as a state ) and then update the code below to write that correctly
 	if(type == READ){
-		insertReader(lptr->lqueue);
+		insertReader(currpid, lptr->lqueue, lpriority);
 		lptr->numReaders++;
+		proctab[currpid].prstate = PR_LWAIT_R;
 	}
 	else{
-		insertWriter(lptr->lqueue);
+		insertWriter(currpid, lptr->lqueue, lpriority);
+		proctab[currpid].prstate = PR_LWAIT_W;
 	}
-	proctab[currpid].prstate = PR_LWAIT;
 	resched();
 
 	restore(mask);
 	return OK;
+}
+
+status insertReader(pid32 pid, qid16 q, int32 key){
+	/* Insert reader according to priority into queue */
+	/* Break ties by putting reader at the end 		  */
+	return insert(pid, q, key);
+}
+
+status insertWriter(pid32 pid, qid16 q, int32 key){
+	/* Insert writer according to priority into queue */
+	/* Break ties by putting writer at the front	  */
+	/* NOTE: This call is just insert() with while loop modified to break ties differently */
+
+	int16	curr;			/* Runs through items in a queue*/
+	int16	prev;			/* Holds previous node index	*/
+
+	if (isbadqid(q) || isbadpid(pid)) {
+		return SYSERR;
+	}
+
+	curr = firstid(q);
+	while (queuetab[curr].qkey > key) {
+		curr = queuetab[curr].qnext;
+	}
+
+	/* Insert process between curr node and previous node */
+
+	prev = queuetab[curr].qprev;	/* Get index of previous node	*/
+	queuetab[pid].qnext = curr;
+	queuetab[pid].qprev = prev;
+	queuetab[pid].qkey = key;
+	queuetab[prev].qnext = pid;
+	queuetab[curr].qprev = pid;
+	return OK;
+
 }

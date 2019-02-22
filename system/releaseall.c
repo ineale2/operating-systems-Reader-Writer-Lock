@@ -6,6 +6,7 @@
 syscall releaseall (int32 numlocks, ...) {
 
 	//your implementation goes here
+	//TODO: Error check  
 
 	return OK;
 }
