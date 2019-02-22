@@ -169,8 +169,8 @@ void reader1 ( int lck, int num, int prio )
 	a = releaseall( 1,lck );
 	if( a != OK )
 		kprintf(" Reader%d: Lock release failed %d ..\n\r", num, a ); 
-	else
-		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
+//	else
+//		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
 }
 
 /* Test2 - Test for basic lcreate, lock, release ( for a write lock ) 
@@ -302,14 +302,14 @@ void test4()
 	
 	lck = lcreate( );
 
-	resume( create( reader1, 2000, 30, "reader", 3, lck, 1, 0 ));
-	resume( create( reader1, 2000, 30, "reader", 3, lck, 2, 0 ));
-	resume( create( writer1, 2000, 30, "writer", 3, lck, 1, 0 ));
+	resume( create( reader1, 2000, 30, "reader1", 3, lck, 1, 0 ));
+	resume( create( reader1, 2000, 30, "reader2", 3, lck, 2, 0 ));
+	resume( create( writer1, 2000, 30, "writer1", 3, lck, 1, 0 ));
 
 	sleep(11);
-	resume( create( writer1, 2000, 30, "writer", 3,lck, 2, 0 ));
-	resume( create( reader1, 2000, 30, "reader", 3,lck, 3, 0 ));
-	resume( create( reader1, 2000, 30, "reader", 3,lck, 4, 0 ));
+	resume( create( writer1, 2000, 30, "writer2", 3,lck, 2, 0 ));
+	resume( create( reader1, 2000, 30, "reader3", 3,lck, 3, 0 ));
+	resume( create( reader1, 2000, 30, "reader4", 3,lck, 4, 0 ));
 
 	sleep(11);
 	

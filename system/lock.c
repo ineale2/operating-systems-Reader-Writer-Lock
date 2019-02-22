@@ -3,6 +3,7 @@
 
 /* Lab 2: Complete this function */
 
+void printQueue(qid16, int);
 local status insertReader(pid32 pid, qid16 q, int32 key);
 local status insertWriter(pid32 pid, qid16 q, int32 key);
 
@@ -16,7 +17,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	mask = disable();
 
 	/* Check that arguments are valid */
-	if( (type != READ && type !=WRITE) || (isbadlock(ldes)) ){
+	if( (type != READ && type !=WRITE) || (isbadlock(ldes)) || (locktab[ldes].lstate != L_USED)  ){
 		restore(mask);
 		return SYSERR;
 	}
@@ -24,7 +25,11 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	lptr = &locktab[ldes];
 	/* If the lock is not held, process gets lock */
 	if(lptr->ltype == FREE){
+		XDEBUG_KPRINTF("lock: ldes %d was free\n", ldes);
 		lptr->ltype = type; 
+		if(lptr->ltype == READ){
+			 lptr->numReaders++;
+		}
 		restore(mask);
 		return OK;
 	}
@@ -33,13 +38,18 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 
 	/* If the lock is held by reader and read is requested, then give lock if priority allows */	
 	if(lptr->ltype == READ && type == READ){
+		XDEBUG_KPRINTF("lock: ldes %d was held\n", ldes);
 		//If the queue is empty, give lock
 		if(isempty(lptr->lqueue)){
+			XDEBUG_KPRINTF("lock: ldes %d readers only. granting lock\n", ldes);
+			lptr->numReaders++;
 			restore(mask);
 			return OK;
 		}
 		/* Queue is not empty, there must be a writer at the front of the queue. */
-		else if( lpriority >= firstid(lptr->lqueue) ){ 			
+		else if( lpriority >= firstkey(lptr->lqueue) ){ 			
+			XDEBUG_KPRINTF("lock: ldes %d reader higher prio than writer. granting lock\n", ldes);
+			lptr->numReaders++;
 			restore(mask);
 			return OK;
 		}
@@ -50,13 +60,15 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	if(type == READ){
 		insertReader(currpid, lptr->lqueue, lpriority);
 		proctab[currpid].prstate = PR_LWAIT_R;
+		XDEBUG_KPRINTF("lock: ldes %d blocking and placing in read state\n", ldes);
 	}
 	else{
 		insertWriter(currpid, lptr->lqueue, lpriority);
 		proctab[currpid].prstate = PR_LWAIT_W;
+		XDEBUG_KPRINTF("lock: ldes %d blocking and placing in write state\n", ldes);
 	}
 	resched();
-
+	XDEBUG_KPRINTF("lock: granted after blocking!\n\n");
 	restore(mask);
 	return OK;
 }
@@ -92,6 +104,8 @@ status insertWriter(pid32 pid, qid16 q, int32 key){
 	queuetab[pid].qkey = key;
 	queuetab[prev].qnext = pid;
 	queuetab[curr].qprev = pid;
+	XDEBUG_KPRINTF("insertWriter: printing queue\n");
+	printQueue(q, XDEBUG);
 	return OK;
 
 }
