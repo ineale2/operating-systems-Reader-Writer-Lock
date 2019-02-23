@@ -46,7 +46,6 @@ status release_lock(int32 ldes){
 	prptr->lockarr[ldes] = NOT_HELD;
 	XDEBUG_KPRINTF("release_lock: ldes = %d\n", ldes);
 	/*Check if there are any processes waiting on this lock */
-	printQueue(lptr->lqueue, XDEBUG);
 	if(isempty(lptr->lqueue)){
 		XDEBUG_KPRINTF("release_lock: none waiting\n");
 		lptr->ltype = FREE;
@@ -89,13 +88,16 @@ void printQueue(qid16 q, int print){
 	pid32 curr = queuehead(q);
 	if(print){
 		kprintf("\nLock Queue:\n");
-		kprintf("curr =  %d prev = %d next = %d HEAD\n", curr, queuetab[curr].qprev, queuetab[curr].qnext);
+		kprintf("curr =  %d prev = %d key = %d next = %d HEAD\n", curr, queuetab[curr].qprev, 
+		queuetab[curr].qkey, queuetab[curr].qnext);
 		while(queuetab[curr].qnext != queuetail(q)){
 			curr = queuetab[curr].qnext;
-			kprintf("curr =  %d prev = %d next = %d\n", curr, queuetab[curr].qprev, queuetab[curr].qnext);
+			kprintf("curr =  %d prev = %d key = %d next = %d\n", curr, queuetab[curr].qprev, 
+			queuetab[curr].qkey, queuetab[curr].qnext);
 		}
 		curr = queuetab[curr].qnext;
-		kprintf("curr =  %d prev = %d next = %d TAIL\n", curr, queuetab[curr].qprev, queuetab[curr].qnext);
+		kprintf("curr =  %d prev = %d key = %d next = %d TAIL\n", curr, queuetab[curr].qprev, 
+		queuetab[curr].qkey, queuetab[curr].qnext);
 		kprintf("\n");
 	}
 

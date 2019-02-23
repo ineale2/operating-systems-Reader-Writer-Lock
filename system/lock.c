@@ -11,6 +11,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 
 
 	//TODO: Update kill to deal with state of deleetion
+	//TODO: Return SYSERR for case where a process tries to lock a lock it already holds
 
 	intmask mask;
 	struct lockent * lptr;
@@ -37,7 +38,6 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	}
 	
 	/* Lock is held */
-
 	/* If the lock is held by reader and read is requested, then give lock if priority allows */	
 	if(lptr->ltype == READ && type == READ){
 		XDEBUG_KPRINTF("lock: ldes %d was held\n", ldes);
@@ -64,12 +64,14 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	if(type == READ){
 		insertReader(currpid, lptr->lqueue, lpriority);
 		proctab[currpid].prstate = PR_LWAIT_R;
-		XDEBUG_KPRINTF("lock: ldes %d blocking and placing in read state\n", ldes);
+		XDEBUG_KPRINTF("After insertReader:\n");
+		printQueue(lptr->lqueue, XDEBUG);
 	}
 	else{
 		insertWriter(currpid, lptr->lqueue, lpriority);
 		proctab[currpid].prstate = PR_LWAIT_W;
-		XDEBUG_KPRINTF("lock: ldes %d blocking and placing in write state\n", ldes);
+		XDEBUG_KPRINTF("After insertWriter:\n");
+		printQueue(lptr->lqueue, XDEBUG);
 	}
 	resched();
 	XDEBUG_KPRINTF("lock: granted after blocking!\n\n");
@@ -89,6 +91,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 status insertReader(pid32 pid, qid16 q, int32 key){
 	/* Insert reader according to priority into queue */
 	/* Break ties by putting reader at the end 		  */
+	XDEBUG_KPRINTF("insertReader: key = %d\n", key);
 	return insert(pid, q, key);
 }
 
@@ -99,6 +102,7 @@ status insertWriter(pid32 pid, qid16 q, int32 key){
 
 	int16	curr;			/* Runs through items in a queue*/
 	int16	prev;			/* Holds previous node index	*/
+	XDEBUG_KPRINTF("insertWriter: key = %d\n", key);
 
 	if (isbadqid(q) || isbadpid(pid)) {
 		return SYSERR;
@@ -117,8 +121,6 @@ status insertWriter(pid32 pid, qid16 q, int32 key){
 	queuetab[pid].qkey = key;
 	queuetab[prev].qnext = pid;
 	queuetab[curr].qprev = pid;
-	XDEBUG_KPRINTF("insertWriter: printing queue\n");
-	printQueue(q, XDEBUG);
 	return OK;
 
 }

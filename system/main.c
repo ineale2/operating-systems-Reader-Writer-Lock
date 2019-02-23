@@ -17,11 +17,16 @@ int lck;
 #define DELETED (-4)
 #endif
 
+int count = 0;
 int lcks [NLOCKS];
 
 void reader1( int, int, int );
 void writer1( int, int, int );
 void loop(int);
+void counter(int, int, int);
+void read_count(int, int, int);
+void holder10(int, int, int, int, int);
+void waiter10(int, int , int);
 
 void test0(void);
 void test1(void);
@@ -30,10 +35,17 @@ void test3(void);
 void test4(void);
 void test5(void);
 void test6(void);
+void test7(void);
+void test8(void);
+void test9(void);
+void test10(void);
+void test11(void);
+void test12(void);
+
 
 int main(int argc, char** argv) {
 	kprintf("\n\nCS503 Lab2 \n\r");
-	kprintf("\n\nRunning test 0\n\r");
+/*	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
 	test1();
@@ -46,8 +58,139 @@ int main(int argc, char** argv) {
 	kprintf("\n\nRunning test 5\n\r");
 	test5();
 	kprintf("\n\nRunning test 6\n\r");
-	test6();
+	test6(); */
+
+//	test7();
+//	test8();
+//	test9();
+	test10();
 	return 0;
+}
+/*TODO: Implement the following test cases
+2) Kill a process that holds a write lock with readers waiting (and ensure that readers print)
+*/
+
+void test10(void){
+	//Create a process that holds multiple locks
+	//Create multiple process that waits on each lock
+	//Kill the first process while it holds the locks
+	//Check for output of the other processes
+
+	kprintf("TEST 10 \n\n");
+	lcks[0] = lcreate();
+	lcks[1] = lcreate();
+	lcks[2] = lcreate();
+	pid32 pid;
+	pid = create(holder10, 2000, 30, "writer8", 5, lcks[0], lcks[1], lcks[2], 0,0);
+	resume(pid);
+	sleepms(500);
+	resume(create(waiter10, 2000, 30, "reader8", 3, lcks[0], 0, 0));
+	resume(create(waiter10, 2000, 30, "reader8", 3, lcks[1], 1, 0));
+	resume(create(waiter10, 2000, 30, "reader8", 3, lcks[2], 2, 0));
+	sleep(2);
+	
+	kprintf("Killing holder\n");
+	kill(pid);
+	kprintf("TEST 10 DONE\n\n");
+}
+
+void holder10(int ldes1, int ldes2, int ldes3, int num, int prio){
+	kprintf("Holder\n");
+	lock(ldes1, WRITE, prio);
+	lock(ldes2, WRITE, prio);
+	lock(ldes3, WRITE, prio);
+	kprintf("Holder acquired locks... entering loop\n");
+	while(1){
+		sleep(1);
+	}
+}
+
+void waiter10(int ldes1, int num, int prio){
+	kprintf("waiter%d\n", num);
+	int a;
+	a = lock(ldes1, WRITE, prio);
+	if(a != OK) kprintf("waiter error\n");
+	kprintf("waiter%d has the lock!\n");
+	a = releaseall(1, ldes1);
+	if(a != OK) kprintf("waiter error2\n");
+}
+
+/* Tests writer priority in case of tie */
+/* Should output writer1 lock, writer2 lock, reader1 lock */
+void test8(void){
+	
+	kprintf("TEST 8\n\n");
+	kprintf("Lock Order Should be: Writer0, Writer1, Reader0\n");
+	lck = lcreate();
+	if(lck == SYSERR) kprintf("Test 8 lcreate error");
+
+	resume(create(writer1, 2000, 30, "writer8", 3, lck, 0,10));
+	sleepms(100);
+	resume(create(reader1, 2000, 30, "reader8", 3, lck, 0, 0));
+	resume(create(writer1, 2000, 30, "writer8", 3, lck, 1, 0));
+	sleep(10);
+	kprintf("TEST 8 DONE\n\n");
+}
+
+void test9(void){
+	
+	kprintf("TEST 9\n\n");
+	kprintf("Lock Order Should be: Writer0, Reader0, Writer1\n");
+	lck = lcreate();
+	if(lck == SYSERR) kprintf("Test 8 lcreate error");
+
+	resume(create(writer1, 2000, 30, "writer8", 3, lck, 0,10));
+	sleepms(100);
+	resume(create(reader1, 2000, 30, "reader8", 3, lck, 0, 1));
+	resume(create(writer1, 2000, 30, "writer8", 3, lck, 1, 0));
+	sleep(10);
+	kprintf("TEST 9 DONE\n\n");
+}
+
+
+
+void test7(void){
+
+	int a;
+	count = 0;
+	kprintf("TEST 7\n\n");
+	lck = lcreate();
+	if(lck == SYSERR) kprintf("Test 7 lcreate error");
+	resched_cntl(DEFER_START);
+	resume(create(read_count, 2000, 30, "readcount0", 2, lck, 0, 0));
+	resume(create(counter, 2000, 30, "counter0", 2, lck, 0,10));
+	resume(create(counter, 2000, 30, "counter1", 2, lck, 1,10));
+	resume(create(counter, 2000, 30, "counter2", 2, lck, 2,10));
+	kprintf("all processes created \n");
+	resched_cntl(DEFER_STOP);
+	sleep(15);
+	kprintf("Count = %d\n", count);
+	kprintf("TEST 7 DONE\n\n");
+}
+
+void counter(int ldes, int num, int prio){
+	kprintf("Counter %d started\n", num);
+	int i;
+	for(i = 0; i< 100000; i++){
+		lock(ldes, WRITE, prio);
+		count++;
+		releaseall(1, ldes);
+	}
+	kprintf("%dW\n", num);
+}
+
+void read_count(int ldes, int num, int prio){
+	while(1){
+		lock(ldes, READ, prio);
+		kprintf("%d %d\n", num, count);
+		if(count >= 3*100000){
+			releaseall(1, ldes);
+			kprintf("%dR\n", num);
+			return;
+		}
+		releaseall(1, ldes);
+		sleepms(0);
+	}
 }
 
 

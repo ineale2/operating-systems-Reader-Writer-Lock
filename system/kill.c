@@ -51,9 +51,10 @@ syscall	kill(
 		/* Fall through */
 
 	case PR_LWAIT_W:
-		//Which locks is this process waiting on?
-		//Need to freeALL the locks this process has 
+		//Which locks is this process waiting on? update numreaders if necessary. maybe type too
+		//Need to freeALL the locks this process has. Could just abuse releaseall() call and call with all locks. 
 		getitem(pid); 		/* Remove from queue */
+		//stop deferring rescheduing, break; and then dont fall through. Make sure process state is set before break;
 		/* Fall through */
 	case PR_LWAIT_R:
 		//Which lock is it waiting on? 
