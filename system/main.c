@@ -45,7 +45,7 @@ void test12(void);
 
 int main(int argc, char** argv) {
 	kprintf("\n\nCS503 Lab2 \n\r");
-/*	kprintf("\n\nRunning test 0\n\r");
+	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
 	test1();
@@ -58,17 +58,14 @@ int main(int argc, char** argv) {
 	kprintf("\n\nRunning test 5\n\r");
 	test5();
 	kprintf("\n\nRunning test 6\n\r");
-	test6(); */
+	test6(); 
 
-//	test7();
-//	test8();
-//	test9();
+	test7();
+	test8();
+	test9();
 	test10();
 	return 0;
 }
-/*TODO: Implement the following test cases
-2) Kill a process that holds a write lock with readers waiting (and ensure that readers print)
-*/
 
 void test10(void){
 	//Create a process that holds multiple locks
@@ -91,6 +88,9 @@ void test10(void){
 	
 	kprintf("Killing holder\n");
 	kill(pid);
+
+	sleep(2);
+	
 	kprintf("TEST 10 DONE\n\n");
 }
 
@@ -110,7 +110,7 @@ void waiter10(int ldes1, int num, int prio){
 	int a;
 	a = lock(ldes1, WRITE, prio);
 	if(a != OK) kprintf("waiter error\n");
-	kprintf("waiter%d has the lock!\n");
+	kprintf("waiter%d has the lock!\n", num);
 	a = releaseall(1, ldes1);
 	if(a != OK) kprintf("waiter error2\n");
 }

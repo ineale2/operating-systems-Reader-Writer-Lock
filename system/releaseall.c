@@ -2,7 +2,7 @@
 #include <xinu.h>
 #include <stdarg.h>
 
-local status release_lock(int32);
+status release_lock(int32, pid32);
 void printQueue(qid16, int);
 
 syscall releaseall (int32 numlocks, ...) {
@@ -17,7 +17,7 @@ syscall releaseall (int32 numlocks, ...) {
 	/* Stop rescheduling during lock release process */
 	resched_cntl(DEFER_START);
 	for(i = 0; i< numlocks; i++){
-		temp  = release_lock(va_arg(valist, int32));
+		temp  = release_lock(va_arg(valist, int32), currpid);
 		if(temp == SYSERR) retVal = SYSERR;
 	}
 	/* Restart rescheduling */
@@ -26,14 +26,14 @@ syscall releaseall (int32 numlocks, ...) {
 	restore(mask);
 	return retVal;
 }
-
-status release_lock(int32 ldes){
+/* rel_pid is the pid that is releasing this lock */
+status release_lock(int32 ldes, pid32 rel_pid){
 	struct lockent* lptr = &locktab[ldes];
 	struct procent* prptr;
 	pid32 pid;
 
 	/* Only allow a process to release a lock that it holds */
-	prptr = &proctab[currpid];
+	prptr = &proctab[rel_pid];
 	if( (prptr->lockarr[ldes] != HELD) || (isbadlock(ldes)) || (locktab[ldes].lstate != L_USED) ) {
 		return SYSERR;
 	}

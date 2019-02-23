@@ -6,6 +6,9 @@
  *  kill  -  Kill a process and remove it from the system
  *------------------------------------------------------------------------
  */
+local void kill_release(pid32, int32);
+status release_lock(int32, pid32);
+
 syscall	kill(
 	  pid32		pid		/* ID of process to kill	*/
 	)
@@ -31,6 +34,13 @@ syscall	kill(
 	}
 	freestk(prptr->prstkbase, prptr->prstklen);
 
+	/* Release all locks this process holds 				*/
+	/* Avoid calling resched() while interrupts are disabled */
+	resched_cntl(DEFER_START);
+	for(i = 0; i<NLOCKS; i++){
+		kill_release(pid, i);
+	}	
+
 	switch (prptr->prstate) {
 	case PR_CURR:
 		prptr->prstate = PR_FREE;	/* Suicide */
@@ -51,10 +61,7 @@ syscall	kill(
 		/* Fall through */
 
 	case PR_LWAIT_W:
-		//Which locks is this process waiting on? update numreaders if necessary. maybe type too
-		//Need to freeALL the locks this process has. Could just abuse releaseall() call and call with all locks. 
 		getitem(pid); 		/* Remove from queue */
-		//stop deferring rescheduing, break; and then dont fall through. Make sure process state is set before break;
 		/* Fall through */
 	case PR_LWAIT_R:
 		//Which lock is it waiting on? 
@@ -64,7 +71,15 @@ syscall	kill(
 	default:
 		prptr->prstate = PR_FREE;
 	}
-
+	resched_cntl(DEFER_STOP);
 	restore(mask);
 	return OK;
+}
+
+void kill_release(pid32 pid, int32 ldes){
+	
+	if(proctab[pid].lockarr[ldes] == HELD){
+		release_lock(ldes, pid);
+	}
+
 }

@@ -9,8 +9,6 @@ local status insertWriter(pid32 pid, qid16 q, int32 key);
 
 syscall lock(int32 ldes, int32 type, int32 lpriority) {
 
-
-	//TODO: Update kill to deal with state of deleetion
 	//TODO: Return SYSERR for case where a process tries to lock a lock it already holds
 
 	intmask mask;
