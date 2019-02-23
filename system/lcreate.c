@@ -27,6 +27,8 @@ int32 newlock(void){ /*Assumes interrupts are disabled */
 		}
 		if(locktab[lock].lstate == L_FREE){
 			//Found a free lock
+			locktab[lock].numReaders = 0;
+			locktab[lock].ltype = FREE;
 			locktab[lock].lstate = L_USED;
 			return lock;
 		}

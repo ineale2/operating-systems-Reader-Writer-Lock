@@ -7,7 +7,6 @@ void printQueue(qid16, int);
 
 syscall releaseall (int32 numlocks, ...) {
 
-	//TODO: Error check  
 	va_list valist;
 	intmask mask;
 	int i;
@@ -33,17 +32,24 @@ status release_lock(int32 ldes){
 	struct procent* prptr;
 	pid32 pid;
 
+	/* Only allow a process to release a lock that it holds */
+	prptr = &proctab[currpid];
+	if( (prptr->lockarr[ldes] != HELD) || (isbadlock(ldes)) || (locktab[ldes].lstate != L_USED) ) {
+		return SYSERR;
+	}
+
 	/* Decrement reader count */
 	if(lptr->ltype == READ){
 		lptr->numReaders--;
 	}
+	/* This process no longer holds this lock */
+	prptr->lockarr[ldes] = NOT_HELD;
 	XDEBUG_KPRINTF("release_lock: ldes = %d\n", ldes);
 	/*Check if there are any processes waiting on this lock */
 	printQueue(lptr->lqueue, XDEBUG);
 	if(isempty(lptr->lqueue)){
 		XDEBUG_KPRINTF("release_lock: none waiting\n");
 		lptr->ltype = FREE;
-		
 	}
 	else{
 		/* Processes are waiting on this lock */
@@ -51,8 +57,6 @@ status release_lock(int32 ldes){
 		prptr = &proctab[pid];
 		if(prptr->prstate == PR_LWAIT_R){
 			lptr->ltype = READ;
-			//ready(pid);
-			//lptr->numReaders++;
 			/* Mark all readers that are higher priority than writers as ready 	*/
 			/* Note that rescheduling is deferred in the calling function 		*/
 			/* Continue dequeueing processes until empty queue or found writer  */ 

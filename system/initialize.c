@@ -99,7 +99,7 @@ void	nulluser()
  */
 static	void	sysinit()
 {
-	int32	i;
+	int32	i, j;
 	struct	procent	*prptr;		/* Ptr to process table entry	*/
 	struct	sentry	*semptr;	/* Ptr to semaphore table entry	*/
 
@@ -133,6 +133,10 @@ static	void	sysinit()
 		prptr->prname[0] = NULLCH;
 		prptr->prstkbase = NULL;
 		prptr->prprio = 0;
+		prptr->lck_del = 0;
+		for(j = 0; j< NLOCKS; j++){
+			prptr->lockarr[j] = NOT_HELD;
+		}
 	}
 
 	/* Initialize the Null process entry */	

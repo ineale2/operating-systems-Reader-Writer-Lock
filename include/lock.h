@@ -9,6 +9,9 @@
 #define L_USED 1
 #define L_FREE 0
 
+#define HELD 1
+#define NOT_HELD 0  
+
 struct	lockent {
 	byte lstate; 			/* Either entry in locktab is L_USED or L_FREE 			*/
 	qid16 lqueue;			/* Queue associated with this lock 		 				*/

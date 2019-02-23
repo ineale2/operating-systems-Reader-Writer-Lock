@@ -50,6 +50,16 @@ syscall	kill(
 		getitem(pid);		/* Remove from queue */
 		/* Fall through */
 
+	case PR_LWAIT_W:
+		//Which locks is this process waiting on?
+		//Need to freeALL the locks this process has 
+		getitem(pid); 		/* Remove from queue */
+		/* Fall through */
+	case PR_LWAIT_R:
+		//Which lock is it waiting on? 
+		//Need to free ALL the locks this process has
+		getitem(pid); 		/* Remove from queue */
+		/* Fall through */
 	default:
 		prptr->prstate = PR_FREE;
 	}

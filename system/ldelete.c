@@ -9,6 +9,7 @@ syscall ldelete(
 {
 	intmask mask;
 	struct lockent* lptr;
+	pid32 pid;
 	mask = disable();
 
 	if(isbadlock(ldes)){
@@ -24,10 +25,14 @@ syscall ldelete(
 
 	/* Set state to free */
 	lptr->lstate = L_FREE;
+
+	/* Mark all processes as ready */
 	resched_cntl(DEFER_START);
 	while(nonempty(lptr->lqueue)){
-		ready(dequeue(lptr->lqueue));
-		//For part 2: mark each of these in process tables and check for this value in lock.c
+		pid = dequeue(lptr->lqueue);
+		ready(pid);
+		/* Set flag to check on return from lock()*/
+		proctab[pid].lck_del = 1;
 	}
 
 	resched_cntl(DEFER_STOP);

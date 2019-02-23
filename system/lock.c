@@ -14,8 +14,9 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 
 	intmask mask;
 	struct lockent * lptr;
+	struct procent * prptr;
 	mask = disable();
-
+	prptr = &proctab[currpid];
 	/* Check that arguments are valid */
 	if( (type != READ && type !=WRITE) || (isbadlock(ldes)) || (locktab[ldes].lstate != L_USED)  ){
 		restore(mask);
@@ -30,6 +31,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 		if(lptr->ltype == READ){
 			 lptr->numReaders++;
 		}
+		prptr->lockarr[ldes] = HELD;
 		restore(mask);
 		return OK;
 	}
@@ -43,6 +45,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 		if(isempty(lptr->lqueue)){
 			XDEBUG_KPRINTF("lock: ldes %d readers only. granting lock\n", ldes);
 			lptr->numReaders++;
+			prptr->lockarr[ldes] = HELD;
 			restore(mask);
 			return OK;
 		}
@@ -50,6 +53,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 		else if( lpriority >= firstkey(lptr->lqueue) ){ 			
 			XDEBUG_KPRINTF("lock: ldes %d reader higher prio than writer. granting lock\n", ldes);
 			lptr->numReaders++;
+			prptr->lockarr[ldes] = HELD;
 			restore(mask);
 			return OK;
 		}
@@ -69,6 +73,15 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	}
 	resched();
 	XDEBUG_KPRINTF("lock: granted after blocking!\n\n");
+	/* Check if the lock was deleted */
+	if(proctab[currpid].lck_del == 1){
+		/* Reset flag and return error */
+		proctab[currpid].lck_del = 0;	
+		restore(mask);
+		return DELETED;
+	}
+	/* Someone else has released the lock, and it is now held */	
+	prptr->lockarr[ldes] = HELD;
 	restore(mask);
 	return OK;
 }
