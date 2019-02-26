@@ -57,6 +57,7 @@
 #define NDESC		5	/* must be odd to make procent 4N bytes	*/
 
 /* Lab 3 TODO - declare variable or #defines here. Add fields to procent */
+#define NO_LOCK (NLOCKS)
 
 /* Definition of the process table (multiple of 32 bits) */
 
@@ -74,6 +75,8 @@ struct procent {		/* Entry in the process table		*/
 	int16	prdesc[NDESC];	/* Device descriptors for process	*/
 	bool8	lockarr[NLOCKS]; /* whether the process holdsa lock */
 	bool8 	lck_del; 	/* Flag for a waiting process to check for deleted lock */
+	uint32 	lockid; 	/* Lock on which this process is waiting */
+	pri16 	prinh; 		/* Inherited priority of this process */
 };
 
 /* Marker for the top of a process stack (used to help detect overflow)	*/

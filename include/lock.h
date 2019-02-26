@@ -17,6 +17,7 @@ struct	lockent {
 	qid16 lqueue;			/* Queue associated with this lock 		 				*/
 	uint8  ltype;			/* Whether the lock is READ, WRITE, or FREE 		    */
 	uint16 numReaders;		/* Number of readers that hold this lock 				*/
+	pri16 maxprio;			/* Maximum priority of processes that hold this lock 	*/  	
 };
 
 /* Lab 2 lock table */

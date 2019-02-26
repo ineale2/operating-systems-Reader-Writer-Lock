@@ -71,6 +71,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 		XDEBUG_KPRINTF("After insertWriter:\n");
 		printQueue(lptr->lqueue, XDEBUG);
 	}
+	prinh_block(ldes)
 	resched();
 	XDEBUG_KPRINTF("lock: granted after blocking!\n\n");
 	/* Check if the lock was deleted */
@@ -84,6 +85,54 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	prptr->lockarr[ldes] = HELD;
 	restore(mask);
 	return OK;
+}
+
+void prinh_block(int32 ldes){
+	struct procent* ptrptr = &proctab[currpid];
+	struct lockent* lptr   = &locktab[ldes];
+	int i;
+	/* Check if there are any updates to process priorities based on pri inh */
+	if(lptr->maxprio < prptr->prinh){
+		/*Update max priority of lock*/
+		lptr->maxprio = prptr->prinh;
+		/* Update process priority of processes holding this lock to max prio */
+		for(i = 0; i< NPROC; i++){
+			if(proctab[i].lockarr[ldes] == HELD){
+				assert(proctab[i].prinh < lptr->maxprio);
+				prinh_changepri(i, lptr->maxprio);
+				/* Ensure transitivity by updating priority of any processes in chain of blocks*/
+				prinh_transitivity(i, lptr->maxprio);
+			}
+
+		}
+		
+		
+	}
+}
+//TODO: Make sure lockid is set properly in lock and release_lock
+//TODO: Make sure to always schedule based on prinh (need to modify ready, and search for any fcn using prprio)
+//TODO: Defer rescheduing around prinh_block?
+//TODO: Write release all prinh code
+
+void prinh_transitivity(pid32 pid, pri16 maxprio){
+	while(proctab[pid].lockid != NO_LOCK){
+		assert(prptr->prinh < maxprio);	
+		prinh_changepri(pid, maxprio);
+		pid = proctab[pid].lockid;
+	}
+}
+
+
+void prinh_changepri(pid32 pid, pri16 newprio){
+	struct procent * prptr = &proctab[pid];
+	/* Update a processes priority to new priority, remove/reinsert into ready queue if necesary */
+	if(prptr->prinh < newprio){
+		prptr->prinh = newprio;
+		if(prptr->prstate == PR_READY){
+			getitem(pid);
+			insert(pid, readylist, prptr->prinh);
+		}
+	}
 }
 
 status insertReader(pid32 pid, qid16 q, int32 key){

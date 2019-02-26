@@ -134,6 +134,8 @@ static	void	sysinit()
 		prptr->prstkbase = NULL;
 		prptr->prprio = 0;
 		prptr->lck_del = 0;
+		prptr->lockid = NO_LOCK; 
+		prptr->prinh = 0;
 		for(j = 0; j< NLOCKS; j++){
 			prptr->lockarr[j] = NOT_HELD;
 		}

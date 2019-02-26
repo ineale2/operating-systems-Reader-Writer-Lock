@@ -15,5 +15,6 @@ void linit(void) {
 		lptr->ltype		 = FREE;
 		lptr->numReaders = 0;
 		lptr->lqueue 	 = newqueue();
+		lptr->maxprio	 = 0;
 	}
 }
