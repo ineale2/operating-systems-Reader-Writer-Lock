@@ -3,6 +3,9 @@
 #include <stdarg.h>
 
 status release_lock(int32, pid32);
+local void reset_maxprio(int32 ldes);
+local void prinh_release(pid32 pid);
+local void unblock(pid32 pid, int32 ldes);
 void printQueue(qid16, int);
 
 syscall releaseall (int32 numlocks, ...) {
@@ -20,6 +23,7 @@ syscall releaseall (int32 numlocks, ...) {
 		temp  = release_lock(va_arg(valist, int32), currpid);
 		if(temp == SYSERR) retVal = SYSERR;
 	}
+	prinh_release(currpid);
 	/* Restart rescheduling */
 	resched_cntl(DEFER_STOP);
 	va_end(valist);
@@ -60,9 +64,9 @@ status release_lock(int32 ldes, pid32 rel_pid){
 			/* Note that rescheduling is deferred in the calling function 		*/
 			/* Continue dequeueing processes until empty queue or found writer  */ 
 			while(nonempty(lptr->lqueue) &&  proctab[firstid(lptr->lqueue)].prstate != PR_LWAIT_W){
-				pid = dequeue(lptr->lqueue);
 				XDEBUG_KPRINTF("release_lock: PID = %d reader waiting\n", pid);
-				ready(pid);	
+				pid = dequeue(lptr->lqueue);
+				unblock(pid, ldes);
 				lptr->numReaders++;
 			}
 		}
@@ -74,14 +78,59 @@ status release_lock(int32 ldes, pid32 rel_pid){
 				lptr->ltype = WRITE;
 				/* Now actually dequeue the item */				
 				pid = dequeue(lptr->lqueue);
-				ready(pid);
+				unblock(pid, ldes);
 			}
 			else{
 				XDEBUG_KPRINTF("release_lock: readers>0, writer still blocked\n");
 			}
 		}
 	}
+	/* Now that processes have been dequeued and marked ready, reset the locks max prio */
+	reset_maxprio(ldes);
 	return OK;
+}
+
+
+//TODO: Does prinh_release take care of transitivity? Does it need to look at lockid?
+
+void reset_maxprio(int32 ldes){
+	struct lockent * lptr = &locktab[ldes];
+	pri16 lock_maxpri = 0;
+	qid16 curr;
+	
+	/* Loop over all processes in this locks queue */
+	curr = firstid(lptr->lqueue);
+	while(curr != queuetail(lptr->lqueue)){
+		if(proctab[curr].prinh > lock_maxpri){
+			lock_maxpri = proctab[curr].prinh;
+		}
+		curr = queuetab[curr].qnext;
+	}
+	/*Assign new lock maxprio */
+	lptr->maxprio = lock_maxpri;
+}
+
+void prinh_release(pid32 pid){
+	struct procent * prptr = &proctab[pid];
+	struct lockent * lptr;
+	int ldes;
+	/* Reset to initial priority */
+	prptr->prinh = prptr->prprio;
+
+	/* Update processes priority to the maximum of processes in the wait queues of locks it holds */	
+	for(ldes = 0; ldes < NLOCKS; ldes++){
+		lptr = &locktab[ldes];
+		if(prptr->lockarr[ldes] == HELD && prptr->prinh < lptr->maxprio){
+				prptr->prinh = lptr->maxprio;
+		}
+	}
+
+}
+
+void unblock(pid32 pid, int32 ldes){
+	ready(pid);
+	proctab[pid].lockid = NO_LOCK;
+	proctab[pid].lockarr[ldes] = HELD;
 }
 
 void printQueue(qid16 q, int print){
