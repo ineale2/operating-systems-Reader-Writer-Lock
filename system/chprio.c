@@ -23,6 +23,10 @@ pri16	chprio(
 	prptr = &proctab[pid];
 	oldprio = prptr->prprio;
 	prptr->prprio = newprio;
+
+	/* Lab 2 added code */
+	prptr->prinh = newprio;
+
 	restore(mask);
 	return oldprio;
 }

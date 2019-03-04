@@ -27,6 +27,7 @@ void counter(int, int, int);
 void read_count(int, int, int);
 void holder10(int, int, int, int, int);
 void waiter10(int, int , int);
+void lp ( int lck, int num, int prio );
 
 void test0(void);
 void test1(void);
@@ -44,7 +45,7 @@ void test12(void);
 
 
 int main(int argc, char** argv) {
-	kprintf("\n\nCS503 Lab2 \n\r");
+/*	kprintf("\n\nCS503 Lab2 \n\r");
 	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
@@ -63,7 +64,11 @@ int main(int argc, char** argv) {
 	test7();
 	test8();
 	test9();
-	test10();
+	test10(); */
+
+	test5();
+
+	test11();
 	return 0;
 }
 
@@ -364,6 +369,7 @@ void test2()
 void writer1 ( int lck, int num, int prio )
 {
 	int a;
+	kprintf(" Writer%d: Attempting lock\n", num);
 	a = lock( lck, WRITE, prio );
 	if( a != OK )
 	  {
@@ -498,6 +504,46 @@ void test5() {
   else
 	  kprintf("deleted!!!\r\n");
   kprintf("Test 5 done..\n\r");
+}
+
+/* Test that priorities are set and released under PRI INH properly */
+void test11(){
+	kprintf("===== TEST 11 =====\n");
+	int lk = lcreate();
+	int lpid, mpid, hpid;
+	
+	resume(lpid = create(lp, 2000, 30, "lprio", 3, lk, 1, 0));
+	sleepms(250);
+	chprio(getpid(), 60);
+	resume(mpid = create(loop, 2000, 40, "loop",1,10));
+	sleepms(250);
+	resume(hpid = create(writer1, 2000, 50, "hprio", 3, lk, 1, 0));
+	
+	sleep(10);
+	kprintf("Priorities: lpid = %d, mpid = %d, hpid = %d\n", proctab[lpid].prinh, proctab[mpid].prinh, proctab[hpid].prinh);
+	kprintf("TEST 11 FINISHED\n");
+}
+
+void lp ( int lck, int num, int prio )
+{
+	int a;
+	a = lock( lck, READ, prio );
+	if( a != OK )
+	{
+	  kprintf(" LP%d: lock failed %d ..\n\r", num, a ); 
+	  return;
+	}
+
+	kprintf(" LP%d: Lock ..\n\r", num );
+	sleep(3);
+	kprintf("In low prio process: prio = %d\n", proctab[getpid()].prinh);
+	kprintf(" LP%d: Releasing ..\n\r", num );
+
+	a = releaseall( 1,lck );
+	if( a != OK )
+		kprintf(" LP%d: Lock release failed %d ..\n\r", num, a ); 
+//	else
+//		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
 }
 
 /*Test6 - DELETED test

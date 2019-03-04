@@ -94,15 +94,20 @@ void prinh_block(int32 ldes){
 	struct procent* prptr = &proctab[currpid];
 	struct lockent* lptr   = &locktab[ldes];
 	int i;
+	XDEBUG_KPRINTF("prinh_block: ldes = %d\n", ldes);
+	XDEBUG_KPRINTF("lptr->maxprio = %d, prptr->prinh = %d\n", lptr->maxprio, prptr->prinh);
 	/* Check if there are any updates to process priorities based on pri inh */
 	if(lptr->maxprio < prptr->prinh){
+		XDEBUG_KPRINTF("updating lock priority...\n");
 		/*Update max priority of lock*/
 		lptr->maxprio = prptr->prinh;
 		/* Update process priority of processes holding this lock to max prio */
 		for(i = 0; i< NPROC; i++){
 			if(proctab[i].lockarr[ldes] == HELD && i != currpid){
 				//assert(proctab[i].prinh < lptr->maxprio);
+				XDEBUG_KPRINTF("pid = %d to update\n", i);
 				prinh_changepri(i, lptr->maxprio);
+				
 				/* Ensure transitivity by updating priority of any processes in chain of blocks*/
 				//prinh_transitivity(i, lptr->maxprio);
 			}
@@ -130,8 +135,10 @@ void prinh_changepri(pid32 pid, pri16 newprio){
 	struct procent * prptr = &proctab[pid];
 	/* Update a processes priority to new priority, remove/reinsert into ready queue if necesary */
 	if(prptr->prinh < newprio){
+		XDEBUG_KPRINTF("PID %d: old prio = %d, new prio = %d\n", pid, prptr->prinh, newprio);
 		prptr->prinh = newprio;
 		if(prptr->prstate == PR_READY){
+			XDEBUG_KPRINTF("pid %d was ready, reinserting\n", pid);
 			getitem(pid);
 			insert(pid, readylist, prptr->prinh);
 		}
