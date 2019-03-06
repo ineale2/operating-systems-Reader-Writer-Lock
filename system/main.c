@@ -45,7 +45,7 @@ void test12(void);
 
 
 int main(int argc, char** argv) {
-/*	kprintf("\n\nCS503 Lab2 \n\r");
+	kprintf("\n\nCS503 Lab2 \n\r");
 	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
@@ -64,9 +64,9 @@ int main(int argc, char** argv) {
 	test7();
 	test8();
 	test9();
-	test10(); */
+	test10();
 
-	test5();
+//	test5();
 
 	test11();
 	return 0;
@@ -486,6 +486,7 @@ void test4()
  * (The order of the readers acquiring / releasing the locks does not matter )
 */
 void test5() {
+	kprintf("TEST 5\n\n");
   int lk = lcreate();
   int mpid;
 
@@ -510,6 +511,7 @@ void test5() {
 void test11(){
 	kprintf("===== TEST 11 =====\n");
 	int lk = lcreate();
+	if(lk == SYSERR) kprintf("lcreate err\n");
 	int lpid, mpid, hpid;
 	
 	resume(lpid = create(lp, 2000, 30, "lprio", 3, lk, 1, 0));

@@ -1,5 +1,6 @@
 /*	lock.c - lock */
 #include <xinu.h>
+#include <lqueue.h>
 
 /* Lab 2: Complete this function */
 
@@ -8,7 +9,7 @@ local status insertReader(pid32 pid, qid16 q, int32 key);
 local status insertWriter(pid32 pid, qid16 q, int32 key);
 local void prinh_block(int32 ldes);
 local void prinh_changepri(pid32 pid, pri16 newprio);
-local void prinh_transitivity(pid32 pid, pri16 maxprio);
+local int32 max(int32 a, int32 b);
 
 syscall lock(int32 ldes, int32 type, int32 lpriority) {
 
@@ -22,9 +23,10 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	/* Check that arguments are valid */
 	if( (type != READ && type !=WRITE) || (isbadlock(ldes)) || (locktab[ldes].lstate != L_USED)  ){
 		restore(mask);
+		XDEBUG_KPRINTF("lock err: ldes  = %d\n", ldes);
 		return SYSERR;
 	}
-
+	
 	lptr = &locktab[ldes];
 	/* If the lock is not held, process gets lock */
 	if(lptr->ltype == FREE){
@@ -64,19 +66,27 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	/* This call should block */
 	if(type == READ){
 		insertReader(currpid, lptr->lqueue, lpriority);
-		proctab[currpid].prstate = PR_LWAIT_R;
+		prptr->prstate = PR_LWAIT_R;
 		XDEBUG_KPRINTF("After insertReader:\n");
 		printQueue(lptr->lqueue, XDEBUG);
 	}
 	else{
 		insertWriter(currpid, lptr->lqueue, lpriority);
-		proctab[currpid].prstate = PR_LWAIT_W;
+		prptr->prstate = PR_LWAIT_W;
 		XDEBUG_KPRINTF("After insertWriter:\n");
 		printQueue(lptr->lqueue, XDEBUG);
 	}
+
+	/* Update lock max priority */
+	lptr->maxprio = max(lptr->maxprio, prptr->prinh);
+	
 	prptr->lockid = ldes;	
 	prinh_block(ldes);
+
+
+	/* Reschedule */
 	resched();
+
 	/* Someone else has released the lock, and it is now held */	
 	XDEBUG_KPRINTF("lock: granted after blocking!\n\n");
 	/* Check if the lock was deleted */
@@ -91,24 +101,70 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 }
 
 void prinh_block(int32 ldes){
+	struct lockent* lptr;
+	pid32 pid;
+	lqueue_t lq;
+	int32 lock;
+	//int32 lockid;
+	XDEBUG_KPRINTF("prinh_block: pid = %d ldes = %d\n", currpid, ldes);
+
+	lq_init(&lq);
+	status a = lq_enqueue(&lq, ldes);	
+	if(a == SYSERR) XDEBUG_KPRINTF("enqueue err\n");
+	while(!lq_empty(&lq)){
+		lock = lq_dequeue(&lq);
+		lptr = &locktab[lock];
+		XDEBUG_KPRINTF("processing ldes = %d\n", lock);
+		for(pid = 0; pid < NPROC; pid++){
+			// For each process that holds the lock //
+			if(proctab[pid].lockarr[lock] == HELD){
+				XDEBUG_KPRINTF("prinh_block: updating pid = %d priority\n", pid);
+				// Update its priority if necessary //
+				prinh_changepri(pid, lptr->maxprio);
+				// Enqueue any lock that this process is blocked on that has maxprio less than newly blocked process //
+				
+				//lockid = proctab[pid].lockid;
+ 				//if(lockid != NO_LOCK){
+				//	lq_enqueue(&lq, lockid);
+					//Update max prio of next lock if necessary
+				//	locktab[lockid].maxprio = max(proctab[pid].prinh, locktab[lockid].maxprio);	
+				//} 
+				
+				
+			}
+		}
+
+	}
+}
+
+int32 max(int32 a, int32 b){
+	if(a > b){
+		return a;
+	}
+	else{
+		return b;
+	}
+}
+/*
+void prinh_block(int32 ldes){
 	struct procent* prptr = &proctab[currpid];
 	struct lockent* lptr   = &locktab[ldes];
 	int i;
 	XDEBUG_KPRINTF("prinh_block: ldes = %d\n", ldes);
 	XDEBUG_KPRINTF("lptr->maxprio = %d, prptr->prinh = %d\n", lptr->maxprio, prptr->prinh);
-	/* Check if there are any updates to process priorities based on pri inh */
+	// Check if there are any updates to process priorities based on pri inh //
 	if(lptr->maxprio < prptr->prinh){
 		XDEBUG_KPRINTF("updating lock priority...\n");
-		/*Update max priority of lock*/
+		//Update max priority of lock
 		lptr->maxprio = prptr->prinh;
-		/* Update process priority of processes holding this lock to max prio */
+		// Update process priority of processes holding this lock to max prio //
 		for(i = 0; i< NPROC; i++){
 			if(proctab[i].lockarr[ldes] == HELD && i != currpid){
 				//assert(proctab[i].prinh < lptr->maxprio);
 				XDEBUG_KPRINTF("pid = %d to update\n", i);
 				prinh_changepri(i, lptr->maxprio);
 				
-				/* Ensure transitivity by updating priority of any processes in chain of blocks*/
+				// Ensure transitivity by updating priority of any processes in chain of blocks
 				//prinh_transitivity(i, lptr->maxprio);
 			}
 
@@ -117,20 +173,7 @@ void prinh_block(int32 ldes){
 		
 	}
 }
-//TODO: Fix prinh_transitivity. Lockid is not a pid
-
-void prinh_transitivity(pid32 pid, pri16 maxprio){
-	while(proctab[pid].lockid != NO_LOCK){
-		//assert(prptr->prinh < maxprio);	
-		prinh_changepri(pid, maxprio);
-		pid = proctab[pid].lockid; //WRONG: pid != lockid
-		/*Update priority of all processes that hold this lock */
-
-		//IDEA: Use wait queues of locks held?
-	}
-}
-
-
+*/
 void prinh_changepri(pid32 pid, pri16 newprio){
 	struct procent * prptr = &proctab[pid];
 	/* Update a processes priority to new priority, remove/reinsert into ready queue if necesary */
