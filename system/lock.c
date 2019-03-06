@@ -105,7 +105,7 @@ void prinh_block(int32 ldes){
 	pid32 pid;
 	lqueue_t lq;
 	int32 lock;
-	//int32 lockid;
+	int32 lockid;
 	XDEBUG_KPRINTF("prinh_block: pid = %d ldes = %d\n", currpid, ldes);
 
 	lq_init(&lq);
@@ -123,12 +123,12 @@ void prinh_block(int32 ldes){
 				prinh_changepri(pid, lptr->maxprio);
 				// Enqueue any lock that this process is blocked on that has maxprio less than newly blocked process //
 				
-				//lockid = proctab[pid].lockid;
- 				//if(lockid != NO_LOCK){
-				//	lq_enqueue(&lq, lockid);
+				lockid = proctab[pid].lockid;
+ 				if(lockid != NO_LOCK){
+					lq_enqueue(&lq, lockid);
 					//Update max prio of next lock if necessary
-				//	locktab[lockid].maxprio = max(proctab[pid].prinh, locktab[lockid].maxprio);	
-				//} 
+					locktab[lockid].maxprio = max(proctab[pid].prinh, locktab[lockid].maxprio);	
+				} 
 				
 				
 			}

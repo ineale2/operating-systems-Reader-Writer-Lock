@@ -27,7 +27,12 @@ void counter(int, int, int);
 void read_count(int, int, int);
 void holder10(int, int, int, int, int);
 void waiter10(int, int , int);
+void waiter12(int, int , int);
 void lp ( int lck, int num, int prio );
+void grabber(int ldes1, int num, int prio);
+void proc1(int ldes1, int ldes2, int num, int prio);
+void test13_proc(int num);
+void printPri(pid32* p, int np);
 
 void test0(void);
 void test1(void);
@@ -42,10 +47,11 @@ void test9(void);
 void test10(void);
 void test11(void);
 void test12(void);
+void test13(void);
 
 
 int main(int argc, char** argv) {
-	kprintf("\n\nCS503 Lab2 \n\r");
+	/*kprintf("\n\nCS503 Lab2 \n\r");
 	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
@@ -66,9 +72,12 @@ int main(int argc, char** argv) {
 	test9();
 	test10();
 
-//	test5();
+	test5();
 
 	test11();
+	test12();
+*/
+	test13();
 	return 0;
 }
 
@@ -547,7 +556,184 @@ void lp ( int lck, int num, int prio )
 //	else
 //		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
 }
+//TODO: Run test13() again. Fix the with p5. Put debug statements in the place where ldes is popped off.  
+//TODO: Modify test13() so that there is a bit of transitive priority inheritance that is left over
+void test13(){
+	kprintf("\n\n==== TEST 13 ====\n");
 
+	chprio(getpid(), 50);
+	int i;
+	for(i = 0; i<4; i++){
+		lcks[i] = lcreate();
+	}
+	pid32 p[7];
+	pri16 pri[7] = {20, 10, 30, 45, 15, 20, 20};
+	for(i = 0; i<7; i++){
+    	p[i] = create(test13_proc, 2000, pri[i], "test", 1, i);
+	}	
+	kprintf("Initial Priorities: \n"); printPri(p, 7);
+	kprintf("Expected: p0 = 20 :: p1 = 10 :: p2 = 30 :: p3 = 45 :: p4 = 15 :: p5 = 20 :: p6 = 20 ::\n\n");
+	resume(p[3]);
+	resume(p[4]);
+	resume(p[6]);
+	sleepms(100);
+
+	resume(p[5]);
+	resume(p[1]);
+	sleepms(100);
+
+	resume(p[0]);
+	sleep(1);
+	kprintf("Before p2 Resume: \n"); printPri(p, 7);
+	kprintf("Expected: p0 = 20 :: p1 = 20 :: p2 = 30 :: p3 = 45 :: p4 = 20 :: p5 = 20 :: p6 = 20 ::\n\n");
+	resume(p[2]);
+	sleepms(100);
+	kprintf("After  p2 Resume: \n"); printPri(p, 7);
+	kprintf("Expected: p0 = 30 :: p1 = 30 :: p2 = 30 :: p3 = 45 :: p4 = 30 :: p5 = 30 :: p6 = 20 ::\n\n");
+
+	resume(p[2]); resume(p[3]); resume(p[4]); resume(p[6]);	
+	sleep(1);
+	kprintf("After Resume All: \n"); printPri(p, 7);
+	kprintf("Expected: p0 = 20 :: p1 = 10 :: p2 = 30 :: p3 = 45 :: p4 = 15 :: p5 = 20 :: p6 = 20 ::\n\n");
+
+	sleep(3);
+	for(i = 0; i<4; i++){
+		ldelete(lcks[i]);
+	}
+	kprintf("Test 13 Complete\n");
+}
+
+void printPri(pid32* p, int np){
+	int i;
+	kprintf("Recieved: ");
+	for(i = 0; i<np; i++){
+		kprintf("p%d = %d :: ", i, proctab[p[i]].prinh);
+	}
+	kprintf("\n");
+}
+
+void test13_proc(int num){
+	switch(num){
+		case 0:
+			kprintf("p%d: trying to lock %d\n", num, lcks[0]);
+			lock(lcks[0], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[0]); 
+			kprintf("p%d: trying to lock %d\n", num, lcks[1]);
+			lock(lcks[1], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[1]); 
+			releaseall(2, lcks[0], lcks[1]);
+			kprintf("p%d: released %d and %d \n", num, lcks[0], lcks[1]); 
+			kprintf("p%d done\n", num);
+			break;
+
+		case 1:
+			lock(lcks[1], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[1]); 
+			kprintf("p%d: trying to lock %d\n", num, lcks[2]);
+			lock(lcks[2], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[2]); 
+			kprintf("p%d: releasing %d and %d \n", num, lcks[1], lcks[2]); 
+			releaseall(2, lcks[1], lcks[2]);
+			kprintf("p%d done\n", num);
+			break;
+
+		case 2:
+			kprintf("p%d trying to lock %d\n", num, lcks[0]);
+			lock(lcks[0], WRITE, 0);
+			kprintf("p%d locked %d\n", num, lcks[0]);
+			suspend(getpid());
+			kprintf("p%d: releasing %d\n", num, lcks[0]);
+			releaseall(1, lcks[0]);
+			kprintf("p%d done\n", num);
+			break;
+
+		case 3:
+			lock(lcks[2], READ, 0);
+			kprintf("p%d locked %d\n", num, lcks[2]);
+			suspend(getpid());
+			kprintf("p%d releasing %d\n", num, lcks[2]);
+			releaseall(1, lcks[2]);
+			kprintf("p%d done\n", num);
+			break;
+
+		case 4:
+			lock(lcks[2], READ, 0);
+			lock(lcks[3], READ, 0);
+			kprintf("p%d locked %d and %d\n", num, lcks[2], lcks[3]);
+			suspend(getpid());
+			kprintf("p%d releasing %d and %d\n", num, lcks[2], lcks[3]);
+			releaseall(2, lcks[2], lcks[3]);
+			kprintf("p%d done\n", num);
+			break;
+
+		case 5:
+			kprintf("p%d trying to lock %d\n", num, lcks[2]);
+			lock(lcks[2], WRITE, 0);	
+			kprintf("p%d locked %d\n", num, lcks[2]);
+			kprintf("p%d releasing %d\n", num, lcks[2]);
+			releaseall(1, lcks[2]);	
+			kprintf("p%d done\n", num);
+			break;
+
+		case 6:
+			lock(lcks[3], READ, 0);
+			kprintf("p%d locked %d\n", num, lcks[3]);
+			suspend(getpid());
+			kprintf("p%d releasing %d\n", num, lcks[3]);
+			releaseall(1, lcks[3]);
+			kprintf("p%d done\n", num);
+			break;
+	}
+}
+
+void test12(){
+	kprintf("\n\n==== TEST 12 ====\n");
+	kprintf("Expected output:\np1 = 30 p2 = 30 p3 = 30\n\n");
+	chprio(getpid(), 40);
+	int lock1 = lcreate();
+	int lock2 = lcreate();
+	pid32 p1, p2, p3;
+    resume( p2 = create( grabber, 2000, 10, "p2", 3, lock2, 2, 0 ));
+	sleepms(100);
+    resume( p1 = create( proc1,   2000, 10, "p1", 4, lock1, lock2, 1, 0 ));
+	sleepms(100);
+    resume( p3 = create( grabber, 2000, 30, "p3", 3, lock1, 3, 0 ));
+	sleepms(100);
+	kprintf("Priorities when held: \n");
+	kprintf("\n Prio: p1 = %d p2 = %d p3 = %d\n", proctab[p1].prinh, proctab[p2].prinh, proctab[p3].prinh);
+	
+	sleep(15);
+	kprintf("Priorities when released: \n");
+	kprintf("\n Prio: p1 = %d p2 = %d p3 = %d\n", proctab[p1].prinh, proctab[p2].prinh, proctab[p3].prinh);
+	ldelete(lock1);
+	ldelete(lock2);
+	kprintf("Test 12 Complete\n");
+}
+void proc1(int ldes1, int ldes2, int num, int prio){
+	kprintf("p%d: Locking %d...\n", num, ldes1);
+	int a = lock(ldes1, WRITE, prio);
+	if(a != OK) kprintf("proc1 error\n");	
+	kprintf("p%d: Locked %d... \n", num, ldes1);
+
+	kprintf("p%d: Locking %d...\n", num, ldes2);
+	a = lock(ldes2, WRITE, prio);
+	kprintf("p%d: Locked %d... \n", num, ldes2);
+	if(a != OK) kprintf("proc1 error\n");	
+	kprintf("p%d: releaseing...\n", num);
+	releaseall(2, ldes1, ldes2);
+}
+
+void grabber(int ldes1, int num, int prio){
+	kprintf("p%d: Locking %d...\n", num, ldes1);
+	int a;
+	a = lock(ldes1, WRITE, prio);
+	if(a != OK) kprintf("waiter error\n");
+	kprintf("p%d: Locked %d... \n", num, ldes1);
+	sleep(5);
+	a = releaseall(1, ldes1);
+	kprintf("p%d: Released %d... \n", num, ldes1);
+	if(a != OK) kprintf("waiter error2\n");
+}
 /*Test6 - DELETED test
 *Points - 10
 *Expected Output:
