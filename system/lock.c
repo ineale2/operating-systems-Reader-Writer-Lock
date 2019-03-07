@@ -73,7 +73,7 @@ syscall lock(int32 ldes, int32 type, int32 lpriority) {
 	else{
 		insertWriter(currpid, lptr->lqueue, lpriority);
 		prptr->prstate = PR_LWAIT_W;
-		XDEBUG_KPRINTF("After insertWriter:\n");
+		XDEBUG_KPRINTF("PID = %d After insertWriter:\n", currpid);
 		printQueue(lptr->lqueue, XDEBUG);
 	}
 

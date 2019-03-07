@@ -6,6 +6,7 @@ status release_lock(int32, pid32);
 local void reset_maxprio(int32 ldes);
 local void prinh_release(pid32 pid);
 local void unblock(pid32 pid, int32 ldes);
+local void tieBreaker(int32 ldes);
 void printQueue(qid16, int);
 
 syscall releaseall (int32 numlocks, ...) {
@@ -69,6 +70,10 @@ status release_lock(int32 ldes, pid32 rel_pid){
 				unblock(pid, ldes);
 				lptr->numReaders++;
 			}
+			if(nonempty(lptr->lqueue) && proctab[firstid(lptr->lqueue)].prstate == PR_LWAIT_W){
+				//Stopped dequeueing because there was a writer
+				tieBreaker(ldes);
+			}
 		}
 		else{
 			XDEBUG_KPRINTF("release_lock: PID = %d writer waiting\n", pid);
@@ -90,7 +95,22 @@ status release_lock(int32 ldes, pid32 rel_pid){
 	return OK;
 }
 
-
+void tieBreaker(int32 ldes){
+	//Release any readers whose priorities are equal to the first reader. 
+	struct lockent* lptr = &locktab[ldes];
+	qid16 q      = lptr->lqueue;
+	int32 wlprio = firstkey(q);
+	pid32 writer = firstid(q);
+	pid32 next   = queuetab[writer].qnext;
+	while(next != queuetail(q) && proctab[next].prstate == PR_LWAIT_R && wlprio == queuetab[next].qkey){
+		//Remove from queue and unblock
+		getitem(next);
+		unblock(next, ldes);
+		lptr->numReaders++;
+		//getitem has changed writers next
+		next = queuetab[writer].qnext;
+	} 
+}
 //TODO: Does prinh_release take care of transitivity? Does it need to look at lockid?
 
 void reset_maxprio(int32 ldes){

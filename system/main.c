@@ -33,6 +33,7 @@ void grabber(int ldes1, int num, int prio);
 void proc1(int ldes1, int ldes2, int num, int prio);
 void test13_proc(int num);
 void printPri(pid32* p, int np);
+void waitingWriter(int ldes, int num, int lprio);
 
 void test0(void);
 void test1(void);
@@ -48,11 +49,12 @@ void test10(void);
 void test11(void);
 void test12(void);
 void test13(void);
+void test9point5(void);
 
 
 int main(int argc, char** argv) {
-	/*kprintf("\n\nCS503 Lab2 \n\r");
-	kprintf("\n\nRunning test 0\n\r");
+	kprintf("\n\nCS503 Lab2 \n\r");
+/*	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
 	test1();
@@ -70,14 +72,14 @@ int main(int argc, char** argv) {
 	test7();
 	test8();
 	test9();
+	test9point5();
 	test10();
 
-	test5();
 
 	test11();
+	test13();*/
 	test12();
-*/
-	test13();
+
 	return 0;
 }
 
@@ -146,8 +148,7 @@ void test8(void){
 	kprintf("TEST 8 DONE\n\n");
 }
 
-void test9(void){
-	
+void test9(void){	
 	kprintf("TEST 9\n\n");
 	kprintf("Lock Order Should be: Writer0, Reader0, Writer1\n");
 	lck = lcreate();
@@ -161,6 +162,57 @@ void test9(void){
 	kprintf("TEST 9 DONE\n\n");
 }
 
+void test9point5(void){
+	kprintf("==== TEST 9.5 =====\n");
+	kprintf("Expected Lock Order: Writer1, Reader 1-4, Writer2, Writer3\n");
+	
+	lck = lcreate();
+	
+	pid32 pid;
+	resume(pid = create(waitingWriter, 2000, 30, "writer8", 3, lck, 1, 0));
+	sleepms(30);
+	resume(create(reader1, 2000, 30, "writer8", 3, lck, 1,20));
+	sleepms(30);
+	resume(create(reader1, 2000, 30, "writer8", 3, lck, 2,20));
+	sleepms(30);
+	resume(create(writer1, 2000, 30, "writer8", 3, lck, 2,10));
+	sleepms(30);
+	resume(create(reader1, 2000, 30, "writer8", 3, lck, 3,10));
+	sleepms(30);
+	resume(create(reader1, 2000, 30, "writer8", 3, lck, 4,10));
+	sleepms(30);
+	resume(create(writer1, 2000, 30, "writer8", 3, lck, 3, 5));
+
+	// Make the first writer release the lock
+	resume(pid);
+
+	sleep(15);
+	ldelete(lck);
+	kprintf("TEST 9.5 Complete!\n");
+
+
+}
+
+void waitingWriter(int ldes, int num, int prio){
+	int a;
+	a = lock( lck, WRITE, prio );
+	if( a != OK )
+	  {
+	    kprintf(" Writer%d: lock failed %d ..\n\r", num, a ); 
+	    return;
+	  }
+	
+	kprintf(" Writer%d: Lock ..\n\r", num );
+	suspend(getpid());
+	kprintf(" Writer%d: Releasing ..\n\r", num );
+
+	a = releaseall(1, lck );
+	if( a != OK )
+	  kprintf(" Writer%d: Lock release failed %d ..\n\r", num,a ); 
+	return;
+
+
+}
 
 
 void test7(void){
@@ -530,7 +582,7 @@ void test11(){
 	sleepms(250);
 	resume(hpid = create(writer1, 2000, 50, "hprio", 3, lk, 1, 0));
 	
-	sleep(10);
+	sleep(20);
 	kprintf("Priorities: lpid = %d, mpid = %d, hpid = %d\n", proctab[lpid].prinh, proctab[mpid].prinh, proctab[hpid].prinh);
 	kprintf("TEST 11 FINISHED\n");
 }
@@ -556,8 +608,7 @@ void lp ( int lck, int num, int prio )
 //	else
 //		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
 }
-//TODO: Run test13() again. Fix the with p5. Put debug statements in the place where ldes is popped off.  
-//TODO: Modify test13() so that there is a bit of transitive priority inheritance that is left over
+//TODO: Write test for tie of reader and writers, and make sure readers are granted the lock.
 void test13(){
 	kprintf("\n\n==== TEST 13 ====\n");
 
@@ -589,7 +640,7 @@ void test13(){
 	resume(p[2]);
 	sleepms(100);
 	kprintf("After  p2 Resume: \n"); printPri(p, 7);
-	kprintf("Expected: p0 = 30 :: p1 = 30 :: p2 = 30 :: p3 = 45 :: p4 = 30 :: p5 = 30 :: p6 = 20 ::\n\n");
+	kprintf("Expected: p0 = 30 :: p1 = 30 :: p2 = 30 :: p3 = 45 :: p4 = 30 :: p5 = 20 :: p6 = 20 ::\n\n");
 
 	resume(p[2]); resume(p[3]); resume(p[4]); resume(p[6]);	
 	sleep(1);
@@ -667,6 +718,7 @@ void test13_proc(int num){
 			break;
 
 		case 5:
+			kprintf("p%d, my PID is %d\n", num, currpid);
 			kprintf("p%d trying to lock %d\n", num, lcks[2]);
 			lock(lcks[2], WRITE, 0);	
 			kprintf("p%d locked %d\n", num, lcks[2]);
