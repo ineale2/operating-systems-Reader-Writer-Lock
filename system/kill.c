@@ -8,6 +8,7 @@
  */
 local void kill_release(pid32, int32);
 status release_lock(int32, pid32);
+void prinh_chprio(int32 ldes);
 
 syscall	kill(
 	  pid32		pid		/* ID of process to kill	*/
@@ -54,20 +55,32 @@ syscall	kill(
 
 	case PR_WAIT:
 		semtab[prptr->prsem].scount++;
-		/* Fall through */
+		prptr->prstate = PR_FREE;
+		break;
 
 	case PR_READY:
 		getitem(pid);		/* Remove from queue */
-		/* Fall through */
+		prptr->prstate = PR_FREE;
+		break;
 
 	case PR_LWAIT_W:
 		getitem(pid); 		/* Remove from queue */
-		/* Fall through */
+		if(prptr->lockid != NO_LOCK){
+			prinh_chprio(prptr->lockid);
+		}
+		prptr->prstate = PR_FREE;
+		break;
+
 	case PR_LWAIT_R:
 		//Which lock is it waiting on? 
 		//Need to free ALL the locks this process has
 		getitem(pid); 		/* Remove from queue */
-		/* Fall through */
+		if(prptr->lockid != NO_LOCK){
+			prinh_chprio(prptr->lockid);
+		}
+		prptr->prstate = PR_FREE;
+		break;
+
 	default:
 		prptr->prstate = PR_FREE;
 	}

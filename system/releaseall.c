@@ -3,8 +3,8 @@
 #include <stdarg.h>
 
 status release_lock(int32, pid32);
-local void reset_maxprio(int32 ldes);
-local void prinh_release(pid32 pid);
+void reset_maxprio(int32 ldes);
+void prinh_release(pid32 pid);
 local void unblock(pid32 pid, int32 ldes);
 local void tieBreaker(int32 ldes);
 void printQueue(qid16, int);

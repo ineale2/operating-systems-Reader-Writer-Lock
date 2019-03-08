@@ -17,6 +17,9 @@ int lck;
 #define DELETED (-4)
 #endif
 
+//TODO: Make compile (kill, chprio) and then write test cases. See if resetAllPrio works. 
+//TODO: Lockall. Order by memory address. Probably need to call getmem and then sort the list by mem addr
+
 int count = 0;
 int lcks [NLOCKS];
 
@@ -32,6 +35,7 @@ void lp ( int lck, int num, int prio );
 void grabber(int ldes1, int num, int prio);
 void proc1(int ldes1, int ldes2, int num, int prio);
 void test13_proc(int num);
+void test14_proc(int num);
 void printPri(pid32* p, int np);
 void waitingWriter(int ldes, int num, int lprio);
 
@@ -50,6 +54,8 @@ void test11(void);
 void test12(void);
 void test13(void);
 void test9point5(void);
+void test14(void);
+void test15(void);
 
 
 int main(int argc, char** argv) {
@@ -77,10 +83,145 @@ int main(int argc, char** argv) {
 
 
 	test11();
-	test13();*/
 	test12();
+	test13();
+	test14();
 
+	test15();
+*/
 	return 0;
+}
+void test15(void){
+	kprintf("==== TEST 15 ====\n");
+	chprio(getpid(), 60);
+	int i;
+	pid32 p[5];
+	
+	for(i = 0; i<3; i++){
+		lcks[i] = lcreate();
+	}
+	pri16 pri[5] = {20,  50, 10, 30, 20};
+	for(i = 0; i<5; i++){
+    	p[i] = create(test14_proc, 2000, pri[i], "test", 1, i);
+	}
+	kprintf("Initial Priorities:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = 20 :: p1 = 50 :: p2 = 10 :: p3 = 30 :: p4 = 20 ::\n\n");
+	resume(p[2]); resume(p[4]);
+	sleepms(50);
+	resume(p[0]);
+	resume(p[3]);
+	sleepms(50);
+	resume(p[1]);
+	sleepms(50);
+		
+	kprintf("Blocked Priorities:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = 50 :: p1 = 50 :: p2 = 50 :: p3 = 50 :: p4 = 50 ::\n\n");
+
+	kprintf("Killing p1\n\n");
+	kill(p[1]);
+
+	kprintf("After Kill Priorities:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = XX :: p1 = XX :: p2 = 20 :: p3 = 30 :: p4 = 30 ::\n\n");
+	
+	resume(p[2]); resume(p[4]);
+
+	sleep(1);
+	
+	for(i = 0; i<3; i++){
+		if(SYSERR == ldelete(lcks[i])) kprintf("test15 ldelete err\n");
+	}
+	kprintf("TEST 15 COMPLETE\n");
+
+}
+
+void test14(void){
+	kprintf("==== TEST 14 ====\n");
+	chprio(getpid(), 60);
+	int i;
+	pid32 p[5];
+	
+	for(i = 0; i<3; i++){
+		lcks[i] = lcreate();
+	}
+	pri16 pri[5] = {20,  5, 10, 30, 20};
+	for(i = 0; i<5; i++){
+    	p[i] = create(test14_proc, 2000, pri[i], "test", 1, i);
+	}
+	kprintf("Initial Priorities:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = 20 :: p1 =  5 :: p2 = 10 :: p3 = 30 :: p4 = 20 ::\n\n");
+	resume(p[2]); resume(p[4]);
+	sleepms(50);
+	resume(p[0]);
+	resume(p[3]);
+	resume(p[1]);
+	sleepms(50);
+		
+	kprintf("Blocked Priorities:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = 20 :: p1 =  5 :: p2 = 20 :: p3 = 30 :: p4 = 30 ::\n\n");
+
+	chprio(p[1], 50);
+
+	kprintf("After Chprio  Priorities:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = 50 :: p1 = 50 :: p2 = 50 :: p3 = 50 :: p4 = 50 ::\n\n");
+	
+	chprio(p[1], 5);
+	kprintf("After Changing Back to 5:\n"); printPri(p, 5);
+	kprintf("Expected: p0 = 20 :: p1 =  5 :: p2 = 20 :: p3 = 30 :: p4 = 30 ::\n\n");
+	
+	resume(p[2]); resume(p[4]);
+	sleep(1);
+	
+	for(i = 0; i<3; i++){
+		if(SYSERR == ldelete(lcks[i])) kprintf("test14 ldelete err\n");
+	}
+	kprintf("TEST 14 COMPLETE\n");
+
+}
+
+void test14_proc(int num){
+	switch(num){
+		case 0: 
+			lock(lcks[1], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[1]); 
+
+			kprintf("p%d: trying to lock %d\n", num, lcks[0]);
+			lock(lcks[0], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[0]); 
+			kprintf("p%d DONE\n");
+			break;
+
+		case 1:
+			kprintf("p%d: trying to lock %d\n", num, lcks[1]);
+			lock(lcks[1], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[1]); 
+			kprintf("p%d DONE\n");
+
+			break;
+
+		case 2:
+			lock(lcks[0], READ, 0);
+			kprintf("p%d: locked %d\n", num, lcks[0]); 
+			suspend(getpid());
+			kprintf("p%d DONE\n");
+			break;
+
+		case 3:
+			lock(lcks[0], READ, 0);
+			kprintf("p%d: locked %d\n", num, lcks[0]); 
+			kprintf("p%d: trying to lock %d\n", num, lcks[2]);
+			lock(lcks[2], WRITE, 0);
+			kprintf("p%d DONE\n");
+
+			break;
+
+		case 4:
+			lock(lcks[2], WRITE, 0);
+			kprintf("p%d: locked %d\n", num, lcks[2]); 
+			suspend(getpid());
+			kprintf("p%d DONE\n");
+			break;
+	}
+
 }
 
 void test10(void){
@@ -217,7 +358,6 @@ void waitingWriter(int ldes, int num, int prio){
 
 void test7(void){
 
-	int a;
 	count = 0;
 	kprintf("TEST 7\n\n");
 	lck = lcreate();
@@ -608,7 +748,7 @@ void lp ( int lck, int num, int prio )
 //	else
 //		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
 }
-//TODO: Write test for tie of reader and writers, and make sure readers are granted the lock.
+
 void test13(){
 	kprintf("\n\n==== TEST 13 ====\n");
 
@@ -658,7 +798,7 @@ void printPri(pid32* p, int np){
 	int i;
 	kprintf("Recieved: ");
 	for(i = 0; i<np; i++){
-		kprintf("p%d = %d :: ", i, proctab[p[i]].prinh);
+		kprintf("p%d = %2d :: ", i, proctab[p[i]].prinh);
 	}
 	kprintf("\n");
 }
@@ -737,7 +877,35 @@ void test13_proc(int num){
 			break;
 	}
 }
+/*
+void test14(){
+	kprintf("\n\n==== TEST 14 ===\n");
+	chprio(getpid(), 40);
 
+	int i;
+	for(i = 0; i<2; i++){
+		lcks[i] = lcreate();
+	}
+	pid32 p[3];
+	pri16 pri[3] = {20, 10, 30};
+	for(i = 0; i<7; i++){
+    	p[i] = create(test13_proc, 2000, pri[i], "test", 1, i);
+	}	
+	kprintf("Initial Priorities: \n"); printPri(p, 3);
+	kprintf("Expected: p0 = 20 :: p1 = 10 :: p2 = 30 ::\n\n");
+
+	resume(p[1]); 
+	sleep(10);
+	resume(p[0]);
+	sleep(1);
+	kprintf("Before p2 Resume:\n") ;printPri(p, 3);
+	kprintf("Expected: p0 = 20 :: p1 = 20 :: p2 = 30 ::\n\n");
+	
+	resume(p[2]);
+	sleep(1);
+
+}
+*/
 void test12(){
 	kprintf("\n\n==== TEST 12 ====\n");
 	kprintf("Expected output:\np1 = 30 p2 = 30 p3 = 30\n\n");
