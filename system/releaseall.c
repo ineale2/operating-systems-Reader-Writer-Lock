@@ -15,6 +15,11 @@ syscall releaseall (int32 numlocks, ...) {
 	intmask mask;
 	int i;
 	mask = disable();
+	if(numlocks <= 0){
+		restore(mask);
+		return SYSERR;
+	}
+
 	status retVal = OK; 
 	status temp;
 	va_start(valist, numlocks);
@@ -51,7 +56,7 @@ status release_lock(int32 ldes, pid32 rel_pid){
 	prptr->lockarr[ldes] = NOT_HELD;
 	XDEBUG_KPRINTF("release_lock: ldes = %d\n", ldes);
 	/*Check if there are any processes waiting on this lock */
-	if(isempty(lptr->lqueue)){
+	if(isempty(lptr->lqueue) && lptr->numReaders == 0){
 		XDEBUG_KPRINTF("release_lock: none waiting\n");
 		lptr->ltype = FREE;
 	}
@@ -111,7 +116,6 @@ void tieBreaker(int32 ldes){
 		next = queuetab[writer].qnext;
 	} 
 }
-//TODO: Does prinh_release take care of transitivity? Does it need to look at lockid?
 
 void reset_maxprio(int32 ldes){
 	struct lockent * lptr = &locktab[ldes];
@@ -136,13 +140,20 @@ void prinh_release(pid32 pid){
 	int ldes;
 	/* Reset to initial priority */
 	prptr->prinh = prptr->prprio;
+	int chgFlg = 0;
 
 	/* Update processes priority to the maximum of processes in the wait queues of locks it holds */	
 	for(ldes = 0; ldes < NLOCKS; ldes++){
 		lptr = &locktab[ldes];
 		if(prptr->lockarr[ldes] == HELD && prptr->prinh < lptr->maxprio){
-				prptr->prinh = lptr->maxprio;
+			prptr->prinh = lptr->maxprio;
+			chgFlg = 1;			
 		}
+	}
+	if(prptr->prstate == PR_READY && chgFlg){
+		XDEBUG_KPRINTF("pid %d was ready, reinserting\n", pid);
+		getitem(pid);
+		insert(pid, readylist, prptr->prinh);
 	}
 
 }

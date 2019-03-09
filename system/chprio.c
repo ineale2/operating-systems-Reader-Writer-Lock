@@ -29,14 +29,26 @@ pri16	chprio(
 	prptr = &proctab[pid];
 	oldprio = prptr->prprio;
 	prptr->prprio = newprio;
-
+	
 	/* Lab 2 added code */
-	prptr->prinh = newprio;
-
-	/* Is this process blocked? If so, update priority */
+	if(prptr->prinh < newprio){
+		prptr->prinh = newprio;
+		/* Remove from ready list and reinsert */
+		if(prptr->prstate == PR_READY){
+			getitem(pid);
+			insert(pid, readylist, prptr->prinh);	
+		}
+	}
+	//For equal case... do nothing
+	if(prptr->prinh > newprio){
+		/* Reset its inherited priority */
+		prinh_release(pid);
+	}
+	/* Is this process blocked? If so, update priority of other processes*/
 	if(prptr->lockid != NO_LOCK){
 		prinh_chprio(prptr->lockid);
 	}
+	resched();
 	restore(mask);
 	return oldprio;
 }

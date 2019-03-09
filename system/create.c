@@ -45,6 +45,11 @@ pid32	create(
 	prptr->prstate = PR_SUSP;	/* Initial state is suspended	*/
 	prptr->prprio = priority;
 	prptr->prinh  = priority;
+	prptr->lockid = NO_LOCK;
+	prptr->lck_del = 0;
+	for(i=0 ; i<NLOCKS; i++){
+		prptr->lockarr[i] = NOT_HELD;
+	}
 	prptr->prstkbase = (char *)saddr;
 	prptr->prstklen = ssize;
 	prptr->prname[PNMLEN-1] = NULLCH;

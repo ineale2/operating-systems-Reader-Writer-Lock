@@ -14,3 +14,7 @@ status lq_enqueue(lqueue_t*, int32);
 
 int32 lq_dequeue(lqueue_t*);
 
+status lq_sort(lqueue_t*);
+
+void print_lqueue(lqueue_t* lq, int print);
+

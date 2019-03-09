@@ -17,8 +17,6 @@ int lck;
 #define DELETED (-4)
 #endif
 
-//TODO: Make compile (kill, chprio) and then write test cases. See if resetAllPrio works. 
-//TODO: Lockall. Order by memory address. Probably need to call getmem and then sort the list by mem addr
 
 int count = 0;
 int lcks [NLOCKS];
@@ -56,11 +54,14 @@ void test13(void);
 void test9point5(void);
 void test14(void);
 void test15(void);
-
+void test16(void);
+void test17(void);
+void test18(void);
+void test19(void);
 
 int main(int argc, char** argv) {
 	kprintf("\n\nCS503 Lab2 \n\r");
-/*	kprintf("\n\nRunning test 0\n\r");
+	kprintf("\n\nRunning test 0\n\r");
 	test0();
 	kprintf("\n\nRunning test 1\n\r");
 	test1();
@@ -76,6 +77,7 @@ int main(int argc, char** argv) {
 	test6(); 
 
 	test7();
+
 	test8();
 	test9();
 	test9point5();
@@ -88,9 +90,136 @@ int main(int argc, char** argv) {
 	test14();
 
 	test15();
-*/
+
+	test16();
+	
+	test17();
+	test18();
 	return 0;
 }
+void test18(void){
+	kprintf("==== TEST 18 ====\n");
+	lck = lcreate();
+	pid32 p0; pid32 p1; pid32 p2;
+	resume(p1 = create(reader1, 2000, 10, "writer8", 3, lck, 0,10));
+	resume(p2 = create(reader1, 2000, 30, "writer8", 3, lck, 0,10));
+	sleepms(500);	
+	resume(p0 = create(writer1, 2000, 20, "writer8", 3, lck, 0,10));
+
+	sleepms(50);
+	kprintf("Readers should have locks... writer should block\n");
+	kprintf("Expected: \n");
+	kprintf("Pri: p0 = 20 p1 = 20 p2 = 30\n");	
+	kprintf("Pri: p0 = %d p1 = %d p2 = %d\n", proctab[p0].prinh, proctab[p1].prinh, proctab[p2].prinh);
+	kprintf("delete lock\n");
+	ldelete(lck);
+
+	kprintf("Expected: ");
+	kprintf("Pri: p0 = 20 p1 = 10 p2 = 30\n");	
+	kprintf("Pri: p0 = %d p1 = %d p2 = %d\n", proctab[p0].prinh, proctab[p1].prinh, proctab[p2].prinh);
+
+	kprintf("TEST 18 DONE\n");
+}
+
+
+void test17(void){
+	kprintf("\n\n==== TEST 17 ===\n");
+	lck = lcreate();	
+	pid32 p1; 
+	pid32 p0;
+
+	resume(p0 = create(writer1, 2000, 20, "writer8", 3, lck, 0,10));
+	sleepms(50);
+	resume(p1 = create(writer1, 2000, 10, "writer8", 3, lck, 1,10));
+
+	sleep(1);
+	chprio(p0, 5);
+	kprintf("Expected:\n");
+	kprintf("p0 = 10 p1 = 10\n");
+	kprintf("p0 = %2d p1 = %2d\n", proctab[p0].prinh, proctab[p1].prinh);
+	
+	sleep(1);
+	kprintf("TEST 17 DONE\n");
+	
+}
+
+
+void test16(void){
+	kprintf("===TEST 16===\n");
+	status s;
+	int i;
+	for(i = 0; i < 6; i++){
+		lcks[i] = lcreate();
+	}
+	kprintf("lcks[5] = %d\n", lcks[5]);
+	kprintf("Locking one lock... \n");
+	s = lockall(READ, 0, 1, lcks[0]);
+	if(s!=OK) kprintf("err1\n");
+	kprintf("Locked\n");
+
+	kprintf("Creating writer, should block...\n");
+	resume(create(writer1, 2000, 30, "writer8", 3, lcks[0], 0,10));
+
+	sleep(1);
+	kprintf("Release...\n");
+	releaseall(1,lcks[0]); 
+	sleep(3);
+
+	kprintf("Many locks...\n");
+	s = lockall(READ, 0, 6, lcks[3], lcks[5], lcks[0], lcks[2], lcks[4], lcks[1]);
+	kprintf("Writers should block... reader should get lock\n");
+	resume(create(writer1, 2000, 30, "writer8", 3, lcks[1], 0,10));
+	resume(create(writer1, 2000, 30, "writer8", 3, lcks[3], 0,10));
+	resume(create(reader1, 2000, 30, "writer8", 3, lcks[5], 15,10));
+	sleepms(500);
+	kprintf("before release many: lcks[5] (type) = %d\n", locktab[lcks[5]].ltype);
+	kprintf("numreaders = %d\n", locktab[lcks[5]].numReaders);
+	kprintf("Releasing many...\n");
+	releaseall(6, lcks[3], lcks[5], lcks[0], lcks[2], lcks[4], lcks[1]);	
+
+	sleep(7);
+	kprintf("after both releases: lcks[5] (type) = %d\n", locktab[lcks[5]].ltype);
+	kprintf("numreaders = %d\n", locktab[lcks[5]].numReaders);
+	kprintf("All (2 writers, 1 reader)  should have released by now...\n");
+	kprintf("\n\nR0 No locks should be acquired...\n");
+	kprintf("All Should Be 0: ");
+	for(i = 0; i < 6; i++){
+		kprintf("lock%d = %d ", i, locktab[lcks[i]].ltype); 
+	}
+	kprintf("\n");
+
+	kprintf("Doing some invalid calls...\n");
+	s = lockall(WRITE, 0, 0, lcks[3], lcks[5], lcks[0], lcks[2], lcks[4], lcks[1]);
+	if(s != SYSERR) kprintf("err2\n");
+	s = lockall(WRITE, 0, -3, lcks[3], lcks[5], lcks[0], lcks[2], lcks[4], lcks[1]);
+	if(s != SYSERR) kprintf("err3\n");
+	s = lockall(12, 0, 6, lcks[3], lcks[5], lcks[0], lcks[2], lcks[4], lcks[1]);
+	if(s != SYSERR) kprintf("err4\n");
+	kprintf("No locks should be acquired...\n");
+	kprintf("All Should Be 0: ");
+	for(i = 0; i < 6; i++){
+		kprintf("lock%d = %d ", i, locktab[lcks[i]].ltype); 
+	}
+	kprintf("\n");
+	kprintf("OK\n");
+	kprintf("Many locks... some invalid\n");	
+	s = lockall(WRITE, 0, 6, lcks[5], lcks[2], -2, 20, lcks[4], lcks[1]);
+	if(s != SYSERR) kprintf("err5\n");
+	kprintf("R2 All Should Be 0: ");
+	for(i = 0; i < 6; i++){
+		kprintf("lock%d = %d ", i, locktab[lcks[i]].ltype); 
+	}
+	kprintf("\n");
+	kprintf("Writer should acquire lock...\n");
+	pid32 pid;
+	resume(pid = create(writer1, 2000, 30, "writer8", 3, lcks[5], 20,10));
+
+
+
+	sleep(4);
+	kprintf("TEST 16 DONE\n");
+}
+
 void test15(void){
 	kprintf("==== TEST 15 ====\n");
 	chprio(getpid(), 60);
@@ -369,7 +498,7 @@ void test7(void){
 	resume(create(counter, 2000, 30, "counter2", 2, lck, 2,10));
 	kprintf("all processes created \n");
 	resched_cntl(DEFER_STOP);
-	sleep(15);
+	sleep(8);
 	kprintf("Count = %d\n", count);
 	kprintf("TEST 7 DONE\n\n");
 }
@@ -514,12 +643,13 @@ void reader1 ( int lck, int num, int prio )
 	kprintf(" Reader%d: Lock ..\n\r", num );
 	sleep(3);
 	kprintf(" Reader%d: Releasing ..\n\r", num );
-
+	if(num == 15) kprintf("Before Release: Reader%d: ltype = %d\n", num, locktab[lck].ltype);
 	a = releaseall( 1,lck );
+	if(num == 15) kprintf("After Release: Reader%d: ltype = %d\n", num, locktab[lck].ltype);
 	if( a != OK )
 		kprintf(" Reader%d: Lock release failed %d ..\n\r", num, a ); 
-//	else
-//		kprintf(" Reader%d: Lock release done ..\n\r", num ); 
+	//else
+	//	kprintf(" Reader%d: Lock release done ..\n\r", num ); 
 }
 
 /* Test2 - Test for basic lcreate, lock, release ( for a write lock ) 
@@ -571,6 +701,8 @@ void writer1 ( int lck, int num, int prio )
 {
 	int a;
 	kprintf(" Writer%d: Attempting lock\n", num);
+	if(num == 20) kprintf("Writer%d, ltype  = %d, SB 0 \n",num, locktab[lck].ltype);
+	if(num == 20) kprintf("Writer%d, numReaders  = %d, SB 0 \n",num, locktab[lck].numReaders);
 	a = lock( lck, WRITE, prio );
 	if( a != OK )
 	  {
